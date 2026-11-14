@@ -22,6 +22,12 @@ this file repeats their rules in the form an agent needs, and links to them for 
 - **Leave alone what the TV needs to work:** the TV app and input services behind HDMI and the tuner,
   the input/source menu, remote and Bluetooth pairing, the on-screen keyboard, Play Store and Play
   Services. When a package name says nothing, read `dumpsys package <name>`, then ask.
+- **Never disable Android's core packages:** the permission controller, package installer, ext
+  services/shared and module metadata (`com.android.*` and `com.google.android.*`),
+  `com.google.android.overlay.modules*`, `com.android.providers.*` (calendar, contacts, user dictionary
+  and blocked numbers aside), `com.android.systemui`, `com.android.shell`, `com.android.phone`,
+  `com.android.settings`, `com.android.tv.settings`, `android`. Without them Android may not boot (#884);
+  `tools/disable.sh`, `disable.ps1` and `check.py --fix` refuse such a list, with no override.
 - **Never start a factory or test package** (`com.cvte.tv.hkcfac`, `mediatek.factorymenu.ui` and the like),
   not even to look. On some boards that flips a factory-mode flag the shell cannot undo.
 - **Keep the Home guard.** The stock launcher is disabled only after the new launcher is installed and
@@ -62,11 +68,11 @@ share their TV's list afterwards, follow [Add a TV list](#add-a-tv-list) below.
 | `SHOWCASE.md` | Projects built on this repo that live in their own repositories. |
 | `CODE_OF_CONDUCT.md` | Includes the rule against publishing device identifiers, Wi-Fi names and IPs. |
 | `examples/` | One folder per tested TV model: `debloat.txt`, sometimes a `README.md` and a `config.json`. Indexed in `examples/README.md`. |
-| `docs/` | `docs/TROUBLESHOOTING.md`, `docs/REMOTE.md` (another home, over Tailscale), `docs/modules.md` and `docs/specs/card.md` (module cards), `docs/PRESS.md`, and `docs/devices/` for models with notes but no tested list. |
+| `docs/` | `docs/TROUBLESHOOTING.md`, `docs/REMOTE.md` (another home, over Tailscale), `docs/modules.md` and `docs/specs/card.md` (module cards), `docs/PRESS.md`, `docs/devices/` for models with notes but no tested list, and `docs/workflows/` for multi-step methods (see [Workflows](#workflows)). |
 | `launcher/` | The reference launcher, package `com.gathin.tvhome`: plain Java, AndroidX RecyclerView and DynamicAnimation, `minSdk` 26, no `INTERNET` permission. |
 | `themes/` | One folder per theme: `config.json`, a required `screenshot.jpg`, optional wallpapers. Keys are documented in `themes/README.md`. |
 | `addons/` | Optional module-card apps, each its own Gradle project, never built into the launcher. |
-| `tools/` | The ADB client and the scripts: `tv.py`, `b64push.py`, `relay.py` (guide: `tools/relay.md`), `disable.sh`, `restore.sh`, `recovery.py`, `check.py`, `privacy.py`, `theme.sh`, `adb-closed.py`, `bench.py`, `race_calendar.py`. Shell scripts have PowerShell twins (`disable.ps1` and the like). `readme_stats.py`, `readme_featured.py` and `readme_card.py` draw the README card. Each script's usage is in its first lines: read it before running it. |
+| `tools/` | The ADB client and the scripts: `tv.py`, `b64push.py`, `relay.py` (guide: `tools/relay.md`), `disable.sh`, `restore.sh`, `recovery.py`, `check.py`, `privacy.py`, `theme.sh`, `adb-closed.py`, `bench.py`, `trace.py` and `trace_report.py` (guide: `tools/trace.md`, optional `tools/requirements-perf.txt`), `flamechart.py` (guide: `tools/flamechart.md`), `race_calendar.py`. Shell scripts have PowerShell twins (`disable.ps1` and the like). `readme_stats.py`, `readme_featured.py` and `readme_card.py` draw the README card. Each script's usage is in its first lines: read it before running it. |
 | `tests/` | Python `unittest` suite: list format, README tables, press counts, themes, add-ons, the Home guard and the tools against fake TVs. |
 | `.github/workflows/` | `ci.yml` (tests, launcher build, APK size gate), `addons.yml`, `maintainer-bot.yml`. |
 | `.github/maintainer/MAINTAINER.md` | The review policy the maintainer and the PR bot apply. |
@@ -208,7 +214,7 @@ no switch. No new dependencies in `launcher/app/build.gradle` without an issue f
 
 ### Add a press entry
 
-1. Add a row `| Outlet | [Headline](url) | Date |` to the right country section of `docs/PRESS.md`, in the
+1. Add a row `| Outlet | [Headline](<url>) | Date |` to the right country section of `docs/PRESS.md`, in the
    headline's own language. The link must open and show the article: no syndicated copies, no auto-generated
    listings, nothing that cannot be checked.
 2. Update the counts in all four places `tests/test_press_counts.py` checks: the `docs/PRESS.md` intro line,
@@ -228,13 +234,21 @@ no switch. No new dependencies in `launcher/app/build.gradle` without an issue f
   `tests/test_*_note.py` files). If you reword one of those passages, run the suite and keep the fact.
 - Docs and the README stay in step: a new list, theme, add-on or tool gets its row where the others are.
 
+## Workflows
+
+Multi-step methods in `docs/workflows/`. Read the one that fits before you start; each opens with when to
+use it and links the tool guides it needs.
+
+- [`perf-ab.md`](docs/workflows/perf-ab.md): measure performance improvements or regressions from a launcher
+  change, with traces, a report and flame charts.
+
 ## Before opening a PR
 
 | Check | Command or rule |
 |---|---|
 | Tests, as CI runs them | `python3 -m unittest discover -s tests -v` after `python3 -m venv tools/venv` and `tools/venv/bin/pip install -r tools/requirements.txt`. On `main`, CI sets `CLEANYOURTV_STRICT=1`, which also checks the README's TV-model count. |
 | Launcher, if you touched `launcher/` | JDK 17, Android SDK platform 34, build-tools 34.0.0. In `launcher/`: `./gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease`. Lint must stay at zero errors. |
-| APK size gate | `launcher/app/build/outputs/apk/release/app-release.apk` must be under 471,040 B (460 KB). Linux: `stat -c %s`, macOS: `stat -f %z`. |
+| APK size gate | `launcher/app/build/outputs/apk/release/app-release.apk` must be under 491,520 B (480 KB). Linux: `stat -c %s`, macOS: `stat -f %z`. |
 | README rows | A new list has its row in `README.md` and `examples/README.md`; a theme in `themes/README.md`; an add-on in `addons/README.md`. |
 | One topic per PR | A TV list never rides inside a launcher feature PR. A device's list plus small fixes for that same device can be one PR. |
 | Tested on | Say which TV, Android version and firmware you tested on, in the PR template's "Tested on" line. |
